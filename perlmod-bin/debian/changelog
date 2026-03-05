@@ -1,3 +1,11 @@
+perlmod-bin (0.3.0-1) trixie; urgency=medium
+
+  * fix name alignment in notes parser
+  * don't replace the specified lib-package if the same package exists in the
+    ELF notes
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 05 Mar 2026 14:12:15 +0100
+
 perlmod-bin (0.2.2-1) bookworm; urgency=medium
 
   * add support to list packages from the ELF notes sections without

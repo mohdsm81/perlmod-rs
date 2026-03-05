@@ -11,12 +11,11 @@ Build-Depends-Arch: cargo:native <!nocheck>,
  librust-syn-2+default-dev <!nocheck>,
  librust-syn-2+full-dev <!nocheck>
 Maintainer: Debian Rust Maintainers <pkg-rust-maintainers@alioth-lists.debian.net>
-Standards-Version: 4.7.0
+Standards-Version: 4.7.2
 Vcs-Git: 
 Vcs-Browser: 
 Homepage: https://git.proxmox.com/?p=perlmod.git
 X-Cargo-Crate: perlmod-macro
-Rules-Requires-Root: no
 
 Package: librust-perlmod-macro-dev
 Architecture: any
@@ -33,7 +32,7 @@ Provides:
  librust-perlmod-macro-0+default-dev (= ${binary:Version}),
  librust-perlmod-macro-0.10-dev (= ${binary:Version}),
  librust-perlmod-macro-0.10+default-dev (= ${binary:Version}),
- librust-perlmod-macro-0.10.0-dev (= ${binary:Version}),
- librust-perlmod-macro-0.10.0+default-dev (= ${binary:Version})
+ librust-perlmod-macro-0.10.1-dev (= ${binary:Version}),
+ librust-perlmod-macro-0.10.1+default-dev (= ${binary:Version})
 Description: Perl package macros to create perl package bindings from rust at compile time - Rust source code
  Source code for Debianized Rust crate "perlmod-macro"

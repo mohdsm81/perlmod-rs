@@ -13,12 +13,11 @@ Build-Depends-Arch: cargo:native <!nocheck>,
  librust-serde-1+default-dev <!nocheck>,
  perl (>= 5.38~) <!nocheck>
 Maintainer: Debian Rust Maintainers <pkg-rust-maintainers@alioth-lists.debian.net>
-Standards-Version: 4.7.0
+Standards-Version: 4.7.2
 Vcs-Git: 
 Vcs-Browser: 
 Homepage: https://git.proxmox.com/?p=perlmod.git
 X-Cargo-Crate: perlmod
-Rules-Requires-Root: no
 
 Package: librust-perlmod-dev
 Architecture: any
@@ -35,7 +34,7 @@ Recommends:
 Provides:
  librust-perlmod-0-dev (= ${binary:Version}),
  librust-perlmod-0.14-dev (= ${binary:Version}),
- librust-perlmod-0.14.0-dev (= ${binary:Version})
+ librust-perlmod-0.14.1-dev (= ${binary:Version})
 Description: Ffi & serde code for limited interaction with perl code - Rust source code
  Source code for Debianized Rust crate "perlmod"
 
@@ -55,9 +54,9 @@ Provides:
  librust-perlmod-0.14+perlmod-macro-dev (= ${binary:Version}),
  librust-perlmod-0.14+default-dev (= ${binary:Version}),
  librust-perlmod-0.14+exporter-dev (= ${binary:Version}),
- librust-perlmod-0.14.0+perlmod-macro-dev (= ${binary:Version}),
- librust-perlmod-0.14.0+default-dev (= ${binary:Version}),
- librust-perlmod-0.14.0+exporter-dev (= ${binary:Version})
+ librust-perlmod-0.14.1+perlmod-macro-dev (= ${binary:Version}),
+ librust-perlmod-0.14.1+default-dev (= ${binary:Version}),
+ librust-perlmod-0.14.1+exporter-dev (= ${binary:Version})
 Description: Ffi & serde code for limited interaction with perl code - feature "perlmod-macro" and 2 more
  This metapackage enables feature "perlmod-macro" for the Rust perlmod crate, by
  pulling in any additional dependencies needed by that feature.

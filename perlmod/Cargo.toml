@@ -1,6 +1,6 @@
 [package]
 name = "perlmod"
-version = "0.14.0"
+version = "0.14.1"
 build = "build.rs"
 categories = [ "API bindings" ]
 keywords = [ "ffi", "perl" ]

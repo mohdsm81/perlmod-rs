@@ -1,3 +1,14 @@
+rust-perlmod (0.14.1-1) trixie; urgency=medium
+
+  * add support for 'wantarray' / 'gimme'
+  * add a serializer specific to return-values to support return values based
+    on the 'wantarray'/'gimme' values as well as returning arrays as *lists*
+    instead of array-references
+  * support void-context return values
+  * replace test-script with a proper test suite
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 05 Mar 2026 14:11:08 +0100
+
 rust-perlmod (0.14.0-1) trixie; urgency=medium
 
   * re-build for Debian Trixie based releases.

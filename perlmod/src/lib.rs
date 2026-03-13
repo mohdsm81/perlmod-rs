@@ -123,6 +123,22 @@ pub mod __private__ {
     //! This is private and not meant to be a public API and thus semver exempt.
 
     pub use super::elf_notes::ElfNote;
+
+    /// Exporting this in order to access it via perlmod-macro without the user requiring serde as
+    /// a direct dependency.
+    pub use serde;
+
+    pub struct InParameterDeserialization {
+        _guard: crate::raw_value::RawGuard,
+    }
+
+    impl InParameterDeserialization {
+        pub fn guard() -> Self {
+            Self {
+                _guard: crate::raw_value::guarded_on(),
+            }
+        }
+    }
 }
 
 /// Shortcut for `Gimme::get() == Gimme::List`.

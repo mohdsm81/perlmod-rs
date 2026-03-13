@@ -25,6 +25,10 @@ struct ArgumentAttrs {
 
     /// Call `TryFrom<&Value>::try_from` for this argument instead of deserializing it.
     try_from_ref: bool,
+
+    /// Slurp the remaining arguments (like an `@rest` at the end).
+    /// This requires the parameter to implement `FromIterator<T: Deserialize>`.
+    list: Option<Span>,
 }
 
 impl ArgumentAttrs {
@@ -35,6 +39,8 @@ impl ArgumentAttrs {
             self.try_from_ref = true;
         } else if path.is_ident("cv") {
             self.cv = Some(path.span());
+        } else if path.is_ident("list") {
+            self.list = Some(path.span());
         } else {
             return false;
         }
@@ -54,10 +60,15 @@ impl ArgumentAttrs {
     }
 
     fn validate(&self, span: Span) -> Result<(), Error> {
-        if self.raw as usize + self.try_from_ref as usize + self.cv.is_some() as usize > 1 {
+        if self.raw as usize
+            + self.try_from_ref as usize
+            + self.cv.is_some() as usize
+            + self.list.is_some() as usize
+            > 1
+        {
             bail!(
                 span,
-                "`raw` and `try_from_ref` and `cv` attributes are mutually exclusive"
+                "`raw` and `try_from_ref`, `cv` and `list` attributes are mutually exclusive"
             );
         }
         Ok(())
@@ -72,6 +83,26 @@ impl ArgumentAttrs {
                 pt.attrs.retain(|attr| !this.handle_attr(attr));
                 this.validate(pt.span())?;
                 Ok((this, &*pt))
+            }
+        }
+    }
+
+    fn extract_argument_code(
+        &self,
+        span: Span,
+        extracted_name: &Ident,
+        none_handling: TokenStream,
+    ) -> TokenStream {
+        if self.list.is_some() {
+            quote_spanned! { span=>
+                let #extracted_name = args.map(::perlmod::Value::from);
+            }
+        } else {
+            quote_spanned! { span=>
+                let #extracted_name: ::perlmod::Value = match args.next() {
+                    Some(arg) => ::perlmod::Value::from(arg),
+                    None => #none_handling
+                };
             }
         }
     }
@@ -98,6 +129,24 @@ impl ArgumentAttrs {
                                 .into_raw());
                         }
                     };
+            }
+        } else if self.list.is_some() {
+            quote_spanned! { span=>
+                let #deserialized_name = {
+                    let _guard = ::perlmod::__private__::InParameterDeserialization::guard();
+                    match <#arg_type as ::perlmod::__private__::serde::Deserialize>::deserialize(
+                        ::perlmod::__private__::serde::de::value::SeqDeserializer::new(
+                            #extracted_name.map(::perlmod::de::Deserializer::<'static>::from_value)
+                        )
+                    ) {
+                        Ok(arg) => arg,
+                        Err(err) => {
+                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                                .into_mortal()
+                                .into_raw());
+                        }
+                    }
+                };
             }
         } else {
             quote_spanned! { span=>
@@ -163,8 +212,17 @@ pub fn handle_function(
     let mut deserialized_arguments = TokenStream::new();
     let mut passed_arguments = TokenStream::new();
     let mut cv_arg_param = TokenStream::new();
+    let mut had_list_param = false;
     for arg in &mut func.sig.inputs {
         let (argument_attrs, pat_ty) = ArgumentAttrs::for_input(arg)?;
+
+        if had_list_param {
+            if let Some(span) = argument_attrs.list {
+                bail!(span, "only 1 #[list] parameter allowed");
+            }
+        } else {
+            had_list_param = argument_attrs.list.is_some();
+        }
 
         let arg_name = match &*pat_ty.pat {
             syn::Pat::Ident(ident) => {
@@ -206,6 +264,8 @@ pub fn handle_function(
         let none_handling = if is_option_type(arg_type).is_some() {
             trailing_options += 1;
             quote_spanned! { span=> ::perlmod::Value::new_undef(), }
+        } else if argument_attrs.list.is_some() {
+            TokenStream::new()
         } else {
             // only count the trailing options;
             trailing_options = 0;
@@ -218,12 +278,11 @@ pub fn handle_function(
             }
         };
 
-        extract_arguments.extend(quote_spanned! { span=>
-            let #extracted_name: ::perlmod::Value = match args.next() {
-                Some(arg) => ::perlmod::Value::from(arg),
-                None => #none_handling
-            };
-        });
+        extract_arguments.extend(argument_attrs.extract_argument_code(
+            span,
+            &extracted_name,
+            none_handling,
+        ));
 
         deserialized_arguments.extend(argument_attrs.deserialized_argument_code(
             span,
@@ -260,14 +319,26 @@ pub fn handle_function(
         },
     };
 
-    let too_many_args_error = syn::LitStr::new(
-        &format!(
-            "too many parameters for function '{}', (expected {})\n",
-            name,
-            func.sig.inputs.len() - (!cv_arg_param.is_empty()) as usize
-        ),
-        Span::call_site(),
-    );
+    let finalize_arguments = if !had_list_param {
+        let too_many_args_error = syn::LitStr::new(
+            &format!(
+                "too many parameters for function '{}', (expected {})\n",
+                name,
+                func.sig.inputs.len() - (!cv_arg_param.is_empty()) as usize
+            ),
+            Span::call_site(),
+        );
+
+        quote_spanned! { span=>
+            if args.next().is_some() {
+                return Err(::perlmod::Value::new_string(#too_many_args_error)
+                    .into_mortal()
+                    .into_raw());
+            }
+        }
+    } else {
+        TokenStream::new()
+    };
 
     let ReturnHandling {
         return_type,
@@ -300,16 +371,11 @@ pub fn handle_function(
 
             let argmark = unsafe { ::perlmod::ffi::pop_arg_mark() };
             let mut args = argmark.iter();
+            { let _ = &mut args; }
 
             #extract_arguments
 
-            if args.next().is_some() {
-                return Err(::perlmod::Value::new_string(#too_many_args_error)
-                    .into_mortal()
-                    .into_raw());
-            }
-
-            //drop(args);
+            #finalize_arguments
 
             #deserialized_arguments
 
@@ -334,14 +400,18 @@ pub fn handle_function(
         perl_name: attr.perl_name,
         xs_name,
         tokens,
-        prototype: attr
-            .prototype
-            .or_else(|| Some(gen_prototype(func.sig.inputs.len(), trailing_options))),
+        prototype: attr.prototype.or_else(|| {
+            Some(gen_prototype(
+                func.sig.inputs.len(),
+                trailing_options,
+                had_list_param,
+            ))
+        }),
     })
 }
 
-fn gen_prototype(arg_count: usize, trailing_options: usize) -> String {
-    let arg_count = arg_count - trailing_options;
+fn gen_prototype(arg_count: usize, trailing_options: usize, had_list_param: bool) -> String {
+    let arg_count = arg_count - trailing_options - (had_list_param as usize);
 
     let mut proto = String::with_capacity(arg_count + trailing_options + 1);
 
@@ -353,6 +423,11 @@ fn gen_prototype(arg_count: usize, trailing_options: usize) -> String {
         for _ in 0..trailing_options {
             proto.push('$');
         }
+        if had_list_param {
+            proto.push('@');
+        }
+    } else if had_list_param {
+        proto.push_str(";@");
     }
     proto
 }

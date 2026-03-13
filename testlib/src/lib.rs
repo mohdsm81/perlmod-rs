@@ -17,6 +17,8 @@ mod export {
     use anyhow::{Error, bail};
     use serde::{Deserialize, Serialize};
 
+    use perlmod::Value;
+
     #[derive(Debug, Deserialize, Serialize)]
     pub struct NewString(String);
 
@@ -112,5 +114,27 @@ mod export {
     #[export]
     fn trailing_optional(first: u32, second: Option<u32>) -> String {
         format!("{first:?}, {second:?}")
+    }
+
+    #[export]
+    fn trailing_list(first: u32, #[list] rest: Vec<Value>) -> String {
+        format!("first={first}, rest has {} parameters", rest.len())
+    }
+
+    #[export]
+    fn trailing_list_and_options(
+        first: u32,
+        second: Option<u32>,
+        #[list] rest: Vec<Value>,
+    ) -> String {
+        format!(
+            "1st={first}, 2nd={second:?}, rest has {} parameters",
+            rest.len()
+        )
+    }
+
+    #[export]
+    fn sum_list(#[list] rest: Vec<u32>) -> u32 {
+        rest.into_iter().sum()
     }
 }

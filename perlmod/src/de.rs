@@ -24,6 +24,14 @@ pub struct Deserializer<'de> {
     _lifetime: PhantomData<&'de Value>,
 }
 
+impl<'de> serde::de::IntoDeserializer<'de, Error> for Deserializer<'de> {
+    type Deserializer = Self;
+
+    fn into_deserializer(self) -> Self {
+        self
+    }
+}
+
 /// Deserialize a perl [`Value`].
 ///
 /// Note that this causes all the underlying data to be copied recursively, except for other

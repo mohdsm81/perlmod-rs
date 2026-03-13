@@ -62,6 +62,57 @@ impl ArgumentAttrs {
         }
         Ok(())
     }
+
+    fn for_input(arg: &mut syn::FnArg) -> Result<(Self, &syn::PatType), Error> {
+        let mut this = Self::default();
+
+        match arg {
+            syn::FnArg::Receiver(_) => bail!(arg => "cannot export self-taking methods as xsubs"),
+            syn::FnArg::Typed(pt) => {
+                pt.attrs.retain(|attr| !this.handle_attr(attr));
+                this.validate(pt.span())?;
+                Ok((this, &*pt))
+            }
+        }
+    }
+
+    fn deserialized_argument_code(
+        &self,
+        span: Span,
+        arg_type: &syn::Type,
+        deserialized_name: &Ident,
+        extracted_name: Ident,
+    ) -> TokenStream {
+        if self.raw {
+            quote_spanned! { span=>
+                let #deserialized_name = #extracted_name;
+            }
+        } else if self.try_from_ref {
+            quote_spanned! { span=>
+                let #deserialized_name: #arg_type =
+                    match ::std::convert::TryFrom::try_from(&#extracted_name) {
+                        Ok(arg) => arg,
+                        Err(err) => {
+                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                                .into_mortal()
+                                .into_raw());
+                        }
+                    };
+            }
+        } else {
+            quote_spanned! { span=>
+                let #deserialized_name: #arg_type =
+                    match ::perlmod::from_ref_value(&#extracted_name) {
+                        Ok(data) => data,
+                        Err(err) => {
+                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                                .into_mortal()
+                                .into_raw());
+                        }
+                    };
+            }
+        }
+    }
 }
 
 struct Return {
@@ -113,16 +164,7 @@ pub fn handle_function(
     let mut passed_arguments = TokenStream::new();
     let mut cv_arg_param = TokenStream::new();
     for arg in &mut func.sig.inputs {
-        let mut argument_attrs = ArgumentAttrs::default();
-
-        let pat_ty = match arg {
-            syn::FnArg::Receiver(_) => bail!(arg => "cannot export self-taking methods as xsubs"),
-            syn::FnArg::Typed(pt) => {
-                pt.attrs.retain(|attr| !argument_attrs.handle_attr(attr));
-                argument_attrs.validate(pt.span())?;
-                &*pt
-            }
-        };
+        let (argument_attrs, pat_ty) = ArgumentAttrs::for_input(arg)?;
 
         let arg_name = match &*pat_ty.pat {
             syn::Pat::Ident(ident) => {
@@ -165,7 +207,7 @@ pub fn handle_function(
             trailing_options += 1;
             quote_spanned! { span=> ::perlmod::Value::new_undef(), }
         } else {
-            // only cound the trailing options;
+            // only count the trailing options;
             trailing_options = 0;
             quote_spanned! { span=>
                 {
@@ -183,35 +225,12 @@ pub fn handle_function(
             };
         });
 
-        if argument_attrs.raw {
-            deserialized_arguments.extend(quote_spanned! { span=>
-                let #deserialized_name = #extracted_name;
-            });
-        } else if argument_attrs.try_from_ref {
-            deserialized_arguments.extend(quote_spanned! { span=>
-                let #deserialized_name: #arg_type =
-                    match ::std::convert::TryFrom::try_from(&#extracted_name) {
-                        Ok(arg) => arg,
-                        Err(err) => {
-                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
-                                .into_mortal()
-                                .into_raw());
-                        }
-                    };
-            });
-        } else {
-            deserialized_arguments.extend(quote_spanned! { span=>
-                let #deserialized_name: #arg_type =
-                    match ::perlmod::from_ref_value(&#extracted_name) {
-                        Ok(data) => data,
-                        Err(err) => {
-                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
-                                .into_mortal()
-                                .into_raw());
-                        }
-                    };
-            });
-        }
+        deserialized_arguments.extend(argument_attrs.deserialized_argument_code(
+            span,
+            arg_type,
+            &deserialized_name,
+            extracted_name,
+        ));
 
         if passed_arguments.is_empty() {
             passed_arguments.extend(quote_spanned! { span=> #deserialized_name });

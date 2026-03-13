@@ -1,7 +1,7 @@
 //! Provides "raw perl value" support with a trick similar to how the toml crate's `Spanned` type
 //! works.
 
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -11,13 +11,13 @@ use crate::Value;
 pub(crate) const NAME: &str = "$__perlmod_private_RawValue";
 pub(crate) const VALUE: &str = "$__perlmod_private_raw_value";
 
-thread_local!(static SERIALIZE_RAW: RefCell<bool> = const { RefCell::new(false) });
+thread_local!(static SERIALIZE_RAW: Cell<bool> = const { Cell::new(false) });
 
 pub(crate) struct RawGuard(bool);
 
 impl Drop for RawGuard {
     fn drop(&mut self) {
-        SERIALIZE_RAW.with(|raw| *raw.borrow_mut() = self.0);
+        SERIALIZE_RAW.with(|raw| raw.set(self.0));
     }
 }
 
@@ -28,7 +28,7 @@ pub(crate) fn guarded(on: bool) -> RawGuard {
 
 #[inline]
 pub(crate) fn is_enabled() -> bool {
-    SERIALIZE_RAW.with(|raw| *raw.borrow())
+    SERIALIZE_RAW.with(|raw| raw.get())
 }
 
 /// A raw perl value. This is a type hint that this contains a raw reference and can *only* be

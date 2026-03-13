@@ -22,8 +22,8 @@ impl Drop for RawGuard {
 }
 
 #[inline]
-pub(crate) fn guarded(on: bool) -> RawGuard {
-    SERIALIZE_RAW.with(move |raw| RawGuard(raw.replace(on)))
+pub(crate) fn guarded_on() -> RawGuard {
+    SERIALIZE_RAW.with(move |raw| RawGuard(raw.replace(true)))
 }
 
 #[inline]
@@ -118,7 +118,7 @@ impl Serialize for RawValue {
     where
         S: serde::Serializer,
     {
-        let _guard = guarded(true);
+        let _guard = guarded_on();
         serialize_raw(&self.value, serializer)
     }
 }

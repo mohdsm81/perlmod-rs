@@ -24,8 +24,8 @@ impl Drop for ListGuard {
 }
 
 #[inline]
-pub(crate) fn guarded(on: bool) -> ListGuard {
-    SERIALIZE_LIST.with(move |list| ListGuard(list.replace(on)))
+pub(crate) fn guarded_on() -> ListGuard {
+    SERIALIZE_LIST.with(move |list| ListGuard(list.replace(true)))
 }
 
 #[inline]
@@ -65,7 +65,7 @@ where
             Self::Void => serializer.serialize_unit(),
             Self::Single(inner) => inner.serialize(serializer),
             Self::List(inner) => {
-                let _guard = guarded(true);
+                let _guard = guarded_on();
                 inner.serialize(serializer)
             }
         }

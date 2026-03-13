@@ -29,7 +29,7 @@ pub fn to_value<T>(value: &T) -> Result<Value, Error>
 where
     T: Serialize,
 {
-    let _guard = raw_value::guarded(true);
+    let _guard = raw_value::guarded_on();
     value.serialize(Serializer)
 }
 
@@ -43,7 +43,7 @@ pub fn to_return_value<T>(value: &T) -> Result<ReturnValue, Error>
 where
     T: Serialize,
 {
-    let _guard = raw_value::guarded(true);
+    let _guard = raw_value::guarded_on();
     value.serialize(return_value::ReturnValueSerializer)
 }
 

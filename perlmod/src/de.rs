@@ -40,7 +40,7 @@ pub fn from_value<T>(input: Value) -> Result<T, Error>
 where
     T: serde::de::DeserializeOwned,
 {
-    let _guard = raw_value::guarded(true);
+    let _guard = raw_value::guarded_on();
     let deserializer = Deserializer::<'static>::from_value(input);
     let out = T::deserialize(deserializer)?;
     Ok(out)
@@ -55,7 +55,7 @@ pub fn from_ref_value<'de, T>(input: &'de Value) -> Result<T, Error>
 where
     T: Deserialize<'de>,
 {
-    let _guard = raw_value::guarded(true);
+    let _guard = raw_value::guarded_on();
     let deserializer = Deserializer::<'de>::from_value(input.clone_ref());
     let out = T::deserialize(deserializer)?;
     Ok(out)

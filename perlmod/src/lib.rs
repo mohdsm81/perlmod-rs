@@ -100,6 +100,7 @@ pub use perlmod_macro::package;
 /// * `#[raw]` with a parameter of type [`Value`]: The parameter will be passed as
 ///   is and not go through deserialization. As of perlmod 0.6, deserialization will not produce
 ///   clones anymore, so this is mostly an optimization.
+///
 /// * `#[try_from_ref]`: Instead of regular deserialization, `TryFrom::try_from(&Value)` will be
 ///   used.
 ///
@@ -112,6 +113,11 @@ pub use perlmod_macro::package;
 ///   This can be used, for instance, to associate callables with data, or to create attach boxed
 ///   closures with an xsub as an entry point to retrieving the closure via
 ///   [`magic`](ScalarRef::add_magic).
+///
+/// * `#[list]`: This can be used on the final parameter which needs to be able to deserialize from
+///   a sequence. (Technically just passes perl's argument stack into a
+///   `serde::de::value::SeqDeserializer`.) This causes the prototype to end with `;@` (behaves
+///   correctly with `Option` parameters in front of it).
 ///
 /// For an example on making blessed objects, see [`Value::bless_box`](Value::bless_box()).
 pub use perlmod_macro::export;

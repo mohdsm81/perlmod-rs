@@ -375,34 +375,8 @@ fn handle_return_kind(
         (quote_spanned! { span=> _cv }, TokenStream::new())
     };
 
-    let return_error = if ret.result {
-        if attr.serialize_error {
-            quote_spanned! { span=>
-                match ::perlmod::to_value(&err) {
-                    Ok(err) => return Err(err.into_mortal().into_raw()),
-                    Err(err) => {
-                        return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
-                            .into_mortal()
-                            .into_raw());
-                    }
-                }
-            }
-        } else {
-            quote_spanned! { span=>
-                return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
-                    .into_mortal()
-                    .into_raw());
-            }
-        }
-    } else {
-        TokenStream::new()
-    };
-
-    let copy_errno = if attr.errno {
-        quote_spanned! { span=> ::perlmod::error::copy_errno_to_libc(); }
-    } else {
-        TokenStream::new()
-    };
+    let return_error = ret.return_error_code(attr, name);
+    let copy_errno = ret.copy_errno(attr, name);
 
     let pthx = crate::pthx_param();
     match ret.value {
@@ -583,6 +557,41 @@ fn handle_return_kind(
         handle_return,
         wrapper_func,
     })
+}
+
+impl Return {
+    fn return_error_code(&self, attr: &FunctionAttrs, name: &Ident) -> TokenStream {
+        if !self.result {
+            return TokenStream::new();
+        }
+
+        if attr.serialize_error {
+            quote_spanned! { name.span() =>
+                match ::perlmod::to_value(&err) {
+                    Ok(err) => return Err(err.into_mortal().into_raw()),
+                    Err(err) => {
+                        return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                            .into_mortal()
+                            .into_raw());
+                    }
+                }
+            }
+        } else {
+            quote_spanned! { name.span() =>
+                return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                    .into_mortal()
+                    .into_raw());
+            }
+        }
+    }
+
+    fn copy_errno(&self, attr: &FunctionAttrs, name: &Ident) -> TokenStream {
+        if attr.errno {
+            quote_spanned! { name.span() => ::perlmod::error::copy_errno_to_libc(); }
+        } else {
+            TokenStream::new()
+        }
+    }
 }
 
 /// Note that we cannot handle renamed imports at all here...

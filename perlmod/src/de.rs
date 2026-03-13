@@ -14,7 +14,11 @@ use crate::scalar::Type;
 use crate::{array, ffi, hash};
 
 /// Perl [`Value`] deserializer.
-struct Deserializer<'de> {
+///
+/// Note that when using this as-is it will *not* support deserializing *raw* values. This is
+/// because `Value` needs to know in advance that this is the type passed to its `Deserialize`
+/// implementation.
+pub struct Deserializer<'de> {
     input: Value,
     option_allowed: bool,
     _lifetime: PhantomData<&'de Value>,

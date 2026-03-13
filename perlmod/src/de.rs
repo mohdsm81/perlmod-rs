@@ -29,8 +29,8 @@ where
     T: serde::de::DeserializeOwned,
 {
     let _guard = raw_value::guarded(true);
-    let mut deserializer = Deserializer::<'static>::from_value(input);
-    let out = T::deserialize(&mut deserializer)?;
+    let deserializer = Deserializer::<'static>::from_value(input);
+    let out = T::deserialize(deserializer)?;
     Ok(out)
 }
 
@@ -44,8 +44,8 @@ where
     T: Deserialize<'de>,
 {
     let _guard = raw_value::guarded(true);
-    let mut deserializer = Deserializer::<'de>::from_value(input.clone_ref());
-    let out = T::deserialize(&mut deserializer)?;
+    let deserializer = Deserializer::<'de>::from_value(input.clone_ref());
+    let out = T::deserialize(deserializer)?;
     Ok(out)
 }
 
@@ -67,7 +67,7 @@ impl Deserializer<'_> {
         Ok(())
     }
 
-    fn sanity_check(&mut self) -> Result<(), Error> {
+    fn sanity_check(&self) -> Result<(), Error> {
         if let Value::Scalar(value) = &self.input {
             match value.ty() {
                 Type::Scalar(_) => Ok(()),
@@ -91,7 +91,7 @@ impl Deserializer<'_> {
     }
 
     /// deserialize_any, preferring a string value
-    fn deserialize_any_string<'de, V>(&mut self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_any_string<'de, V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
@@ -122,7 +122,7 @@ impl Deserializer<'_> {
     }
 
     /// deserialize_any, preferring an integer value
-    fn deserialize_any_iv<'de, V>(&mut self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_any_iv<'de, V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
@@ -188,7 +188,7 @@ unsafe fn str_set_wrong_lifetime<'a>(s: &'_ str) -> &'a str {
     unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(s.as_ptr(), s.len())) }
 }
 
-impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
+impl<'de> de::Deserializer<'de> for Deserializer<'de> {
     type Error = Error;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Error>
@@ -198,7 +198,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.deserialize_any_string(visitor)
     }
 
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_bool<V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
@@ -277,21 +277,21 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.deserialize_any_iv(visitor)
     }
 
-    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_f32<V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
         self.deserialize_any_nv(visitor)
     }
 
-    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_f64<V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
         self.deserialize_any_nv(visitor)
     }
 
-    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_char<V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
@@ -345,7 +345,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.deserialize_any(visitor)
     }
 
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_bytes<V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
@@ -382,7 +382,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         self.deserialize_bytes(visitor)
     }
 
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Error>
+    fn deserialize_option<V>(mut self, visitor: V) -> Result<V::Value, Error>
     where
         V: Visitor<'de>,
     {
@@ -395,9 +395,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 }
             }
             self.option_allowed = false;
-            let res = visitor.visit_some(&mut *self);
-            self.option_allowed = true;
-            res
+            visitor.visit_some(self)
         } else {
             self.deserialize_any(visitor)
         }
@@ -484,7 +482,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     }
 
     fn deserialize_enum<V>(
-        self,
+        mut self,
         _name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
@@ -602,9 +600,7 @@ impl<'de> de::VariantAccess<'de> for VariantDeserializer {
 
     fn unit_variant(self) -> Result<(), Error> {
         match self.value {
-            Some(value) => {
-                de::Deserialize::deserialize(&mut Deserializer::<'de>::from_value(value))
-            }
+            Some(value) => de::Deserialize::deserialize(Deserializer::<'de>::from_value(value)),
             None => Ok(()),
         }
     }
@@ -614,7 +610,7 @@ impl<'de> de::VariantAccess<'de> for VariantDeserializer {
         T: de::DeserializeSeed<'de>,
     {
         match self.value {
-            Some(value) => seed.deserialize(&mut Deserializer::<'de>::from_value(value)),
+            Some(value) => seed.deserialize(Deserializer::<'de>::from_value(value)),
             None => Error::fail("expected newtype variant, found unit variant"),
         }
     }
@@ -695,8 +691,7 @@ impl<'de> MapAccess<'de> for HashAccess<'_> {
         self.at_value = true;
 
         let key = unsafe { Value::from_raw_ref(ffi::RSPL_hv_iterkeysv(self.entry)) };
-        seed.deserialize(&mut Deserializer::from_value(key))
-            .map(Some)
+        seed.deserialize(Deserializer::from_value(key)).map(Some)
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Error>
@@ -717,7 +712,7 @@ impl<'de> MapAccess<'de> for HashAccess<'_> {
             unsafe { Value::from_raw_ref(ffi::RSPL_hv_iterval(self.hash.hv(), self.entry)) };
         self.entry = std::ptr::null_mut();
 
-        seed.deserialize(&mut Deserializer::from_value(value))
+        seed.deserialize(Deserializer::from_value(value))
     }
 }
 
@@ -741,7 +736,7 @@ impl<'de> SeqAccess<'de> for ArrayAccess<'_> {
     {
         self.iter
             .next()
-            .map(move |value| seed.deserialize(&mut Deserializer::from_value(value)))
+            .map(move |value| seed.deserialize(Deserializer::from_value(value)))
             .transpose()
     }
 }

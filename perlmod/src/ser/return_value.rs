@@ -72,6 +72,29 @@ where
     }
 }
 
+/// Wrapper type short cut equivalent to using only [`Return::List`].
+#[derive(Clone, Debug, Default)]
+pub struct ReturnList<T>(pub T);
+
+impl<T> From<T> for ReturnList<T> {
+    fn from(value: T) -> Self {
+        Self(value)
+    }
+}
+
+impl<T> serde::Serialize for ReturnList<T>
+where
+    T: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        let _guard = guarded_on();
+        self.0.serialize(serializer)
+    }
+}
+
 /// This type encodes whether a returned value is a single value or a list.
 pub enum ReturnValue {
     Void,

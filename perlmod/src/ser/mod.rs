@@ -8,7 +8,7 @@ use crate::{array, hash, raw_value};
 
 #[doc(hidden)]
 mod return_value;
-pub use return_value::{Return, ReturnValue};
+pub use return_value::{Return, ReturnList, ReturnValue};
 
 /// Perl [`Value`] serializer.
 struct Serializer;

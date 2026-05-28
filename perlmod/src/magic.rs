@@ -65,7 +65,6 @@ use std::marker::PhantomData;
 
 use crate::ScalarRef;
 use crate::ffi;
-use crate::perl_fn;
 
 /// Pointer-like types which can be leaked and reclaimed.
 ///

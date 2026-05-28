@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::Error;
 use crate::ffi::{self, SV};
+use crate::raw_value;
 use crate::scalar::ScalarRef;
 use crate::{Array, Hash, Scalar};
-use crate::{perl_fn, raw_value};
 
 /// A higher level value. This is basically an [`SV`] already cast to [`AV`](crate::ffi::AV) or
 /// [`HV`](crate::ffi::HV) for arrays and hashes.

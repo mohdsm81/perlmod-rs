@@ -1,3 +1,9 @@
+rust-perlmod-macro (0.10.2-1) trixie; urgency=medium
+
+  * add #[list] attribute for final function parameter
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 29 May 2026 09:02:25 +0200
+
 rust-perlmod-macro (0.10.1-1) trixie; urgency=medium
 
   * add support for returning lists

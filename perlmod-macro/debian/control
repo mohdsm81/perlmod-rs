@@ -32,7 +32,7 @@ Provides:
  librust-perlmod-macro-0+default-dev (= ${binary:Version}),
  librust-perlmod-macro-0.10-dev (= ${binary:Version}),
  librust-perlmod-macro-0.10+default-dev (= ${binary:Version}),
- librust-perlmod-macro-0.10.1-dev (= ${binary:Version}),
- librust-perlmod-macro-0.10.1+default-dev (= ${binary:Version})
+ librust-perlmod-macro-0.10.2-dev (= ${binary:Version}),
+ librust-perlmod-macro-0.10.2+default-dev (= ${binary:Version})
 Description: Perl package macros to create perl package bindings from rust at compile time - Rust source code
  Source code for Debianized Rust crate "perlmod-macro"

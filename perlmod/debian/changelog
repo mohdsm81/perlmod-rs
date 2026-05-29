@@ -1,3 +1,12 @@
+rust-perlmod (0.14.2-1) trixie; urgency=medium
+
+  * make Deserializer public, document its limitations
+  * implement IntoDeserializer for Deserializer
+  * add macro-private exports for the perlmod-macro's new `#[list]` attribute
+  * add `ReturnList` wrapper type
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 29 May 2026 09:01:31 +0200
+
 rust-perlmod (0.14.1-1) trixie; urgency=medium
 
   * add support for 'wantarray' / 'gimme'

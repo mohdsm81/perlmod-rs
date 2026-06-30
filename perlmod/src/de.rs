@@ -399,12 +399,11 @@ impl<'de> de::Deserializer<'de> for Deserializer<'de> {
         V: Visitor<'de>,
     {
         if self.option_allowed {
-            if let Value::Scalar(value) = self.get()? {
-                if let Type::Scalar(flags) = value.ty() {
-                    if flags.is_empty() {
-                        return visitor.visit_none();
-                    }
-                }
+            if let Value::Scalar(value) = self.get()?
+                && let Type::Scalar(flags) = value.ty()
+                && flags.is_empty()
+            {
+                return visitor.visit_none();
             }
             self.option_allowed = false;
             visitor.visit_some(self)

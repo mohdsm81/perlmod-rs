@@ -3,11 +3,9 @@
 /// FNV64a should be good enough for simple string tests, we don't need cryptographic strength, and
 /// we can get this in a few lines without any dependencies.
 fn fnv64a<T: ?Sized + AsRef<[u8]>>(buf: &T) -> u64 {
-    buf.as_ref()
-        .into_iter()
-        .fold(0xcbf29ce484222325, |hval, &b| {
-            (hval ^ u64::from(b)).wrapping_mul(0x100000001b3)
-        })
+    buf.as_ref().iter().fold(0xcbf29ce484222325, |hval, &b| {
+        (hval ^ u64::from(b)).wrapping_mul(0x100000001b3)
+    })
 }
 
 #[test]

@@ -12,10 +12,10 @@ fn main() {
     // quoted, without exterial double qoutes
     let ppport_h_file_string_inner = ppport_h_file.replace('"', "\\\"");
 
-    if let Err(err) = fs::create_dir(Path::new(&include_dir)) {
-        if err.kind() != io::ErrorKind::AlreadyExists {
-            panic!("failed to make include dir in OUT_DIR");
-        }
+    if let Err(err) = fs::create_dir(Path::new(&include_dir))
+        && err.kind() != io::ErrorKind::AlreadyExists
+    {
+        panic!("failed to make include dir in OUT_DIR");
     }
 
     // perl -MDevel::PPPort -e 'Devel::PPPort::WriteFile("include/ppport.h");'

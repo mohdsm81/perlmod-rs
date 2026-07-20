@@ -468,7 +468,14 @@ impl Iterator for StackIter {
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.end - self.at;
+        (remaining, Some(remaining))
+    }
 }
+
+impl ExactSizeIterator for StackIter {}
 
 /// Pop the current argument marker off of the argument marker stack.
 ///

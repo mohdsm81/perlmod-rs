@@ -3,6 +3,7 @@
 
 use std::fmt;
 
+use serde::de::IntoDeserializer;
 use serde::{Deserialize, Serialize};
 
 use crate::Error;
@@ -650,5 +651,13 @@ impl<'de> Deserialize<'de> for Value {
         } else {
             deserializer.deserialize_any(ValueVisitor)
         }
+    }
+}
+
+impl<'de> IntoDeserializer<'de, Error> for Value {
+    type Deserializer = crate::de::Deserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        Self::Deserializer::from_value(self)
     }
 }

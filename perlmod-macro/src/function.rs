@@ -136,7 +136,7 @@ impl ArgumentAttrs {
                     let _guard = ::perlmod::__private__::InParameterDeserialization::guard();
                     match <#arg_type as ::perlmod::__private__::serde::Deserialize>::deserialize(
                         ::perlmod::__private__::serde::de::value::SeqDeserializer::new(
-                            #extracted_name.map(::perlmod::de::Deserializer::<'static>::from_value)
+                            #extracted_name
                         )
                     ) {
                         Ok(arg) => arg,

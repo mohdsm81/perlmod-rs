@@ -86,80 +86,80 @@ impl ArgumentAttrs {
             }
         }
     }
+}
 
-    fn extract_argument_code(
-        &self,
-        span: Span,
-        extracted_name: &Ident,
-        none_handling: TokenStream,
-    ) -> TokenStream {
-        if self.list.is_some() {
-            quote_spanned! { span=>
-                let #extracted_name = args.map(::perlmod::Value::from);
-            }
-        } else {
-            quote_spanned! { span=>
-                let #extracted_name: ::perlmod::Value = match args.next() {
-                    Some(arg) => ::perlmod::Value::from(arg),
-                    None => #none_handling
-                };
-            }
+fn extract_argument_code(
+    arg_attr: &ArgumentAttrs,
+    span: Span,
+    extracted_name: &Ident,
+    none_handling: TokenStream,
+) -> TokenStream {
+    if arg_attr.list.is_some() {
+        quote_spanned! { span=>
+            let #extracted_name = args.map(::perlmod::Value::from);
+        }
+    } else {
+        quote_spanned! { span=>
+            let #extracted_name: ::perlmod::Value = match args.next() {
+                Some(arg) => ::perlmod::Value::from(arg),
+                None => #none_handling
+            };
         }
     }
+}
 
-    fn deserialized_argument_code(
-        &self,
-        span: Span,
-        arg_type: &syn::Type,
-        deserialized_name: &Ident,
-        extracted_name: Ident,
-    ) -> TokenStream {
-        if self.raw {
-            quote_spanned! { span=>
-                let #deserialized_name = #extracted_name;
-            }
-        } else if self.try_from_ref {
-            quote_spanned! { span=>
-                let #deserialized_name: #arg_type =
-                    match ::std::convert::TryFrom::try_from(&#extracted_name) {
-                        Ok(arg) => arg,
-                        Err(err) => {
-                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
-                                .into_mortal()
-                                .into_raw());
-                        }
-                    };
-            }
-        } else if self.list.is_some() {
-            quote_spanned! { span=>
-                let #deserialized_name = {
-                    let _guard = ::perlmod::__private__::InParameterDeserialization::guard();
-                    match <#arg_type as ::perlmod::__private__::serde::Deserialize>::deserialize(
-                        ::perlmod::__private__::serde::de::value::SeqDeserializer::new(
-                            #extracted_name
-                        )
-                    ) {
-                        Ok(arg) => arg,
-                        Err(err) => {
-                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
-                                .into_mortal()
-                                .into_raw());
-                        }
+fn deserialized_argument_code(
+    arg_attr: &ArgumentAttrs,
+    span: Span,
+    arg_type: &syn::Type,
+    deserialized_name: &Ident,
+    extracted_name: Ident,
+) -> TokenStream {
+    if arg_attr.raw {
+        quote_spanned! { span=>
+            let #deserialized_name = #extracted_name;
+        }
+    } else if arg_attr.try_from_ref {
+        quote_spanned! { span=>
+            let #deserialized_name: #arg_type =
+                match ::std::convert::TryFrom::try_from(&#extracted_name) {
+                    Ok(arg) => arg,
+                    Err(err) => {
+                        return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                            .into_mortal()
+                            .into_raw());
                     }
                 };
-            }
-        } else {
-            quote_spanned! { span=>
-                let #deserialized_name: #arg_type =
-                    match ::perlmod::from_ref_value(&#extracted_name) {
-                        Ok(data) => data,
-                        Err(err) => {
-                            return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
-                                .into_mortal()
-                                .into_raw());
-                        }
-                    };
-            }
+        }
+    } else if arg_attr.list.is_some() {
+        quote_spanned! { span=>
+            let #deserialized_name = {
+                let _guard = ::perlmod::__private__::InParameterDeserialization::guard();
+                match <#arg_type as ::perlmod::__private__::serde::Deserialize>::deserialize(
+                    ::perlmod::__private__::serde::de::value::SeqDeserializer::new(
+                        #extracted_name
+                    )
+                ) {
+                    Ok(arg) => arg,
+                    Err(err) => {
+                        return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                            .into_mortal()
+                            .into_raw());
+                    }
+                }
+            };
+        }
+    } else {
+        quote_spanned! { span=>
+            let #deserialized_name: #arg_type =
+                match ::perlmod::from_ref_value(&#extracted_name) {
+                    Ok(data) => data,
+                    Err(err) => {
+                        return Err(::perlmod::Value::new_string(&format!("{err:#}\n"))
+                            .into_mortal()
+                            .into_raw());
+                    }
+                };
         }
     }
 }
@@ -278,13 +278,15 @@ pub fn handle_function(
             }
         };
 
-        extract_arguments.extend(argument_attrs.extract_argument_code(
+        extract_arguments.extend(extract_argument_code(
+            &argument_attrs,
             span,
             &extracted_name,
             none_handling,
         ));
 
-        deserialized_arguments.extend(argument_attrs.deserialized_argument_code(
+        deserialized_arguments.extend(deserialized_argument_code(
+            &argument_attrs,
             span,
             arg_type,
             &deserialized_name,

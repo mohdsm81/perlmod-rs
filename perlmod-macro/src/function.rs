@@ -136,18 +136,19 @@ impl<'s> ArgumentAttr<'s> {
 fn extract_argument_code(
     arg_attr: &ArgumentAttr,
     span: Span,
+    arguments_name: &Ident,
     extracted_name: &Ident,
     none_handling: TokenStream,
 ) -> TokenStream {
     match arg_attr.attr_type {
         Some(ArgumentAttrType::TrailingList(_)) => {
             quote_spanned! { span=>
-                let #extracted_name = args.map(::perlmod::Value::from);
+                let #extracted_name = #arguments_name.map(::perlmod::Value::from);
             }
         }
         _ => {
             quote_spanned! { span=>
-                let #extracted_name: ::perlmod::Value = match args.next() {
+                let #extracted_name: ::perlmod::Value = match #arguments_name.next() {
                     Some(arg) => ::perlmod::Value::from(arg),
                     None => #none_handling
                 };
@@ -252,6 +253,8 @@ pub fn handle_function(
         });
     let impl_xs_name = Ident::new(&format!("impl_xs_{name}"), name.span());
 
+    let arguments_name = syn::Ident::new("args", name.span());
+
     let mut trailing_options = 0;
     let mut extract_arguments = TokenStream::new();
     let mut deserialized_arguments = TokenStream::new();
@@ -326,6 +329,7 @@ pub fn handle_function(
         extract_arguments.extend(extract_argument_code(
             &arg_attr,
             span,
+            &arguments_name,
             &extracted_name,
             none_handling,
         ));
@@ -377,7 +381,7 @@ pub fn handle_function(
         );
 
         quote_spanned! { span=>
-            if args.next().is_some() {
+            if #arguments_name.next().is_some() {
                 return Err(::perlmod::Value::new_string(#too_many_args_error)
                     .into_mortal()
                     .into_raw());
@@ -417,8 +421,8 @@ pub fn handle_function(
             #visibility_action
 
             let argmark = unsafe { ::perlmod::ffi::pop_arg_mark() };
-            let mut args = argmark.iter();
-            { let _ = &mut args; }
+            let mut #arguments_name = argmark.iter();
+            { let _ = &mut #arguments_name; }
 
             #extract_arguments
 

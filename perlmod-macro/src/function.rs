@@ -15,112 +15,159 @@ pub struct XSub {
     pub prototype: Option<String>,
 }
 
-#[derive(Default)]
-struct ArgumentAttrs {
-    /// This is the `CV` pointer.
-    cv: Option<Span>,
-
+enum ArgumentAttrType {
     /// Skip the deserializer for this argument.
-    raw: bool,
+    Raw,
 
     /// Call `TryFrom<&Value>::try_from` for this argument instead of deserializing it.
-    try_from_ref: bool,
+    TryFromRef,
+
+    /// This is the `CV` pointer.
+    CVPtr(Span),
 
     /// Slurp the remaining arguments (like an `@rest` at the end).
     /// This requires the parameter to implement `FromIterator<T: Deserialize>`.
-    list: Option<Span>,
+    TrailingList(Span),
 }
 
-impl ArgumentAttrs {
-    fn handle_path(&mut self, path: &syn::Path) -> bool {
+impl ArgumentAttrType {
+    fn from_attr(attr: &syn::Attribute) -> Option<Self> {
+        Self::from_path(attr.path())
+    }
+
+    fn from_path(path: &syn::Path) -> Option<Self> {
         if path.is_ident("raw") {
-            self.raw = true;
-        } else if path.is_ident("try_from_ref") {
-            self.try_from_ref = true;
-        } else if path.is_ident("cv") {
-            self.cv = Some(path.span());
-        } else if path.is_ident("list") {
-            self.list = Some(path.span());
-        } else {
-            return false;
+            return Some(Self::Raw);
         }
 
-        true
+        if path.is_ident("try_from_ref") {
+            return Some(Self::TryFromRef);
+        }
+
+        if path.is_ident("cv") {
+            return Some(Self::CVPtr(path.span()));
+        }
+
+        if path.is_ident("list") {
+            return Some(Self::TrailingList(path.span()));
+        }
+
+        None
     }
 
-    fn handle_attr(&mut self, attr: &syn::Attribute) -> bool {
-        if self.handle_path(attr.path()) {
-            if !matches!(attr.meta, Meta::Path(_)) {
-                error!(&attr.meta => "attribute does not take any value or parameter");
-            }
-            true
-        } else {
-            false
+    fn is_same_variant_as(&self, other: &Self) -> bool {
+        core::mem::discriminant(self) == core::mem::discriminant(other)
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Raw => "raw",
+            Self::TryFromRef => "try_from_ref",
+            Self::CVPtr(_) => "cv",
+            Self::TrailingList(_) => "list",
         }
     }
+}
 
-    fn validate(&self, span: Span) -> Result<(), Error> {
-        if self.raw as usize
-            + self.try_from_ref as usize
-            + self.cv.is_some() as usize
-            + self.list.is_some() as usize
-            > 1
-        {
-            bail!(
-                span,
-                "`raw` and `try_from_ref`, `cv` and `list` attributes are mutually exclusive"
-            );
-        }
-        Ok(())
-    }
+struct ArgumentAttr<'s> {
+    attr_type: Option<ArgumentAttrType>,
+    pat_type: &'s syn::PatType,
+}
 
-    fn for_input(arg: &mut syn::FnArg) -> Result<(Self, &syn::PatType), Error> {
-        let mut this = Self::default();
-
+impl<'s> ArgumentAttr<'s> {
+    fn new_from_fn_arg(arg: &'s mut syn::FnArg) -> Result<Self, Error> {
         match arg {
-            syn::FnArg::Receiver(_) => bail!(arg => "cannot export self-taking methods as xsubs"),
-            syn::FnArg::Typed(pt) => {
-                pt.attrs.retain(|attr| !this.handle_attr(attr));
-                this.validate(pt.span())?;
-                Ok((this, &*pt))
+            syn::FnArg::Receiver(_) => {
+                bail!(arg => "cannot export self-taking methods as xsubs");
+            }
+            syn::FnArg::Typed(pat_type) => {
+                let mut attr_type: Option<ArgumentAttrType> = None;
+                let mut has_err = false;
+
+                let span = pat_type.span();
+
+                pat_type.attrs.retain(|attr| {
+                    let Some(got_attr_type) = ArgumentAttrType::from_attr(attr) else {
+                        // Attribute has no matching attribute type => retain it
+                        return true;
+                    };
+
+                    if !matches!(attr.meta, Meta::Path(_)) {
+                        error!(&attr.meta => "attribute does not take any value or parameter");
+                        has_err = true;
+                        return false;
+                    }
+
+                    let Some(existing_attr_type) = attr_type.as_ref() else {
+                        // No existing attribute type => assign and don't retain
+                        attr_type = Some(got_attr_type);
+                        return false;
+                    };
+
+                    if existing_attr_type.is_same_variant_as(&got_attr_type) {
+                        let attr_str = existing_attr_type.as_str();
+                        error!(span, "duplicate attribute '{attr_str}'");
+                        has_err = true;
+                        return false;
+                    }
+
+                    // At this point we have two differing attributes
+                    error!(
+                        span,
+                        "`raw`, `try_from_ref`, `cv`, and `list` attributes are mutually exclusive"
+                    );
+                    has_err = true;
+                    false
+                });
+
+                if has_err {
+                    bail!(span, "failed to determine argument attribute");
+                }
+
+                Ok(Self {
+                    attr_type,
+                    pat_type,
+                })
             }
         }
     }
 }
 
 fn extract_argument_code(
-    arg_attr: &ArgumentAttrs,
+    arg_attr: &ArgumentAttr,
     span: Span,
     extracted_name: &Ident,
     none_handling: TokenStream,
 ) -> TokenStream {
-    if arg_attr.list.is_some() {
-        quote_spanned! { span=>
-            let #extracted_name = args.map(::perlmod::Value::from);
+    match arg_attr.attr_type {
+        Some(ArgumentAttrType::TrailingList(_)) => {
+            quote_spanned! { span=>
+                let #extracted_name = args.map(::perlmod::Value::from);
+            }
         }
-    } else {
-        quote_spanned! { span=>
-            let #extracted_name: ::perlmod::Value = match args.next() {
-                Some(arg) => ::perlmod::Value::from(arg),
-                None => #none_handling
-            };
+        _ => {
+            quote_spanned! { span=>
+                let #extracted_name: ::perlmod::Value = match args.next() {
+                    Some(arg) => ::perlmod::Value::from(arg),
+                    None => #none_handling
+                };
+            }
         }
     }
 }
 
 fn deserialized_argument_code(
-    arg_attr: &ArgumentAttrs,
+    arg_attr: &ArgumentAttr,
     span: Span,
     arg_type: &syn::Type,
     deserialized_name: &Ident,
     extracted_name: Ident,
 ) -> TokenStream {
-    if arg_attr.raw {
-        quote_spanned! { span=>
+    match &arg_attr.attr_type {
+        Some(ArgumentAttrType::Raw) => quote_spanned! { span=>
             let #deserialized_name = #extracted_name;
-        }
-    } else if arg_attr.try_from_ref {
-        quote_spanned! { span=>
+        },
+        Some(ArgumentAttrType::TryFromRef) => quote_spanned! { span=>
             let #deserialized_name: #arg_type =
                 match ::std::convert::TryFrom::try_from(&#extracted_name) {
                     Ok(arg) => arg,
@@ -130,9 +177,8 @@ fn deserialized_argument_code(
                             .into_raw());
                     }
                 };
-        }
-    } else if arg_attr.list.is_some() {
-        quote_spanned! { span=>
+        },
+        Some(ArgumentAttrType::TrailingList(_)) => quote_spanned! { span=>
             let #deserialized_name = {
                 let _guard = ::perlmod::__private__::InParameterDeserialization::guard();
                 match <#arg_type as ::perlmod::__private__::serde::Deserialize>::deserialize(
@@ -148,9 +194,8 @@ fn deserialized_argument_code(
                     }
                 }
             };
-        }
-    } else {
-        quote_spanned! { span=>
+        },
+        Some(ArgumentAttrType::CVPtr(_)) | None => quote_spanned! { span=>
             let #deserialized_name: #arg_type =
                 match ::perlmod::from_ref_value(&#extracted_name) {
                     Ok(data) => data,
@@ -160,7 +205,7 @@ fn deserialized_argument_code(
                             .into_raw());
                     }
                 };
-        }
+        },
     }
 }
 
@@ -214,17 +259,17 @@ pub fn handle_function(
     let mut cv_arg_param = TokenStream::new();
     let mut had_list_param = false;
     for arg in &mut func.sig.inputs {
-        let (argument_attrs, pat_ty) = ArgumentAttrs::for_input(arg)?;
+        let arg_attr = ArgumentAttr::new_from_fn_arg(arg)?;
 
-        if had_list_param {
-            if let Some(span) = argument_attrs.list {
-                bail!(span, "only 1 #[list] parameter allowed");
+        if let Some(ArgumentAttrType::TrailingList(list_span)) = arg_attr.attr_type {
+            if had_list_param {
+                bail!(list_span, "only 1 #[list] parameter allowed");
             }
-        } else {
-            had_list_param = argument_attrs.list.is_some();
+
+            had_list_param = true;
         }
 
-        let arg_name = match &*pat_ty.pat {
+        let arg_name = match &*arg_attr.pat_type.pat {
             syn::Pat::Ident(ident) => {
                 if ident.by_ref.is_some() {
                     bail!(ident => "xsub does not support by-ref parameters");
@@ -234,12 +279,12 @@ pub fn handle_function(
                 }
                 &ident.ident
             }
-            _ => bail!(&pat_ty.pat => "xsub does not support this kind of parameter"),
+            _ => bail!(&arg_attr.pat_type.pat => "xsub does not support this kind of parameter"),
         };
 
-        let arg_type = &*pat_ty.ty;
+        let arg_type = &*arg_attr.pat_type.ty;
 
-        if let Some(cv_span) = argument_attrs.cv {
+        if let Some(ArgumentAttrType::CVPtr(cv_span)) = arg_attr.attr_type {
             if !cv_arg_param.is_empty() {
                 bail!(cv_span, "only 1 'cv' parameter allowed");
             }
@@ -264,7 +309,7 @@ pub fn handle_function(
         let none_handling = if is_option_type(arg_type).is_some() {
             trailing_options += 1;
             quote_spanned! { span=> ::perlmod::Value::new_undef(), }
-        } else if argument_attrs.list.is_some() {
+        } else if matches!(arg_attr.attr_type, Some(ArgumentAttrType::TrailingList(_))) {
             TokenStream::new()
         } else {
             // only count the trailing options;
@@ -279,14 +324,14 @@ pub fn handle_function(
         };
 
         extract_arguments.extend(extract_argument_code(
-            &argument_attrs,
+            &arg_attr,
             span,
             &extracted_name,
             none_handling,
         ));
 
         deserialized_arguments.extend(deserialized_argument_code(
-            &argument_attrs,
+            &arg_attr,
             span,
             arg_type,
             &deserialized_name,

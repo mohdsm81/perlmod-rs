@@ -5,7 +5,8 @@ use Test::More tests => 7;
 use TestLib::Refs;
 
 my $ref1 = { x => 'initialized' };
-my $returned_ref = TestLib::Refs::get_ref_from_test_struct({ text => "Some Text", reference => $ref1 });
+my $returned_ref =
+    TestLib::Refs::get_ref_from_test_struct({ text => "Some Text", reference => $ref1 });
 ok(!!$returned_ref, 'returned_ref is not undef');
 is(ref($returned_ref), 'HASH', "a hash reference is returned");
 is($returned_ref->{x}, 'initialized', 'looks like the correct hash');

@@ -16,32 +16,26 @@ my $opts = {
         'An identifier used to avoid loading multiple libraries with the same shared code',
     ],
     'lib-package' => [
-        'Package',
-        'Main package to generate for loading the library',
+        'Package', 'Main package to generate for loading the library',
     ],
     'lib-prefix' => [
-        'Prefix',
-        'Package prefix used for documentation in the library package.',
+        'Prefix', 'Package prefix used for documentation in the library package.',
     ],
     'lib' => [
-        'LIBNAME',
-        "The .so name without the 'lib' prefix.",
+        'LIBNAME', "The .so name without the 'lib' prefix.",
     ],
     'debug-libpath' => [
-        'PATH',
-        "Path to a debug library, usually ./target/debug.",
+        'PATH', "Path to a debug library, usually ./target/debug.",
     ],
     'include-file' => [
         'PATH',
         "Path to additional perl code to include in the package after the 'use' statements",
     ],
     'from-notes' => [
-        undef,
-        "Read the package list from ELF notes sections",
+        undef, "Read the package list from ELF notes sections",
     ],
     'list-from-notes' => [
-        'FILE',
-        "List the package list from an ELF notes section and exit",
+        'FILE', "List the package list from an ELF notes section and exit",
     ],
 };
 
@@ -56,11 +50,12 @@ sub help : prototype($) ($fd) {
 }
 
 sub package_list_from_notes : prototype($) ($file) {
-    open my $cmd, '-|', qw(objcopy -O binary --only-section .note.perlmod.package), $file, '/dev/stdout'
+    open my $cmd, '-|', qw(objcopy -O binary --only-section .note.perlmod.package), $file,
+        '/dev/stdout'
         or die "failed to run objcopy: $!\n";
     my $data = do {
         local $/ = undef;
-        <$cmd>
+        <$cmd>;
     };
     close $cmd;
     die "objcopy exited with errors\n" if $?;
@@ -68,7 +63,7 @@ sub package_list_from_notes : prototype($) ($file) {
     my @packages;
 
     while (length($data)) {
-        my ($name_size, $desc_size, $ty) = unpack('LLL', substr($data, 0, 3*4, ''));
+        my ($name_size, $desc_size, $ty) = unpack('LLL', substr($data, 0, 3 * 4, ''));
         die "unexpected description in package note - incompatible perlmod version?\n"
             if $desc_size;
         my $name = substr($data, 0, $name_size, '');
@@ -110,7 +105,7 @@ ARGPARSE: while (@ARGV) {
             $arg = shift @ARGV;
         } else {
             next;
-        };
+        }
 
         if (!defined($opts->{$o}->[0])) {
             unshift @ARGV, $arg;
@@ -166,7 +161,7 @@ sub pkg2file : prototype($) ($pkg) {
 
 sub parentdir : prototype($) ($path) {
     if ($path =~ m@^(.*)/[^/]+@) {
-        return $1
+        return $1;
     } else {
         die "bad path: '$path', try adding a directory\n";
     }

@@ -6,6 +6,10 @@ CRATES=perlmod perlmod-macro
 .PHONY: all
 all: check
 
+.PHONY: tidy
+tidy:
+	git ls-files ':*.p[ml]'| xargs -n4 -P0 proxmox-perltidy
+
 .PHONY: deb
 deb: $(foreach c,$(CRATES), $c-deb)
 	echo $(foreach c,$(CRATES), $c-deb)

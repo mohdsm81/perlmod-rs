@@ -4,6 +4,7 @@ pub mod bless_box;
 pub mod bless_magic;
 pub mod digest;
 pub mod errors;
+pub mod list;
 pub mod refs;
 pub mod ret;
 

@@ -9,6 +9,7 @@ all: check
 .PHONY: tidy
 tidy:
 	git ls-files ':*.p[ml]'| xargs -n4 -P0 proxmox-perltidy
+	proxmox-perltidy testlib-tests/*.t
 
 .PHONY: deb
 deb: $(foreach c,$(CRATES), $c-deb)
